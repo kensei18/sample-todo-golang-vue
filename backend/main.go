@@ -95,7 +95,7 @@ func tasksHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		getTasks(w, db)
 	case "POST":
-		createTask(r, db)
+		createTask(w, r, db)
 	case "PUT":
 		updateTask(r, m, db)
 	case "DELETE":
@@ -119,13 +119,18 @@ func getTasks(w http.ResponseWriter, db *pg.DB) {
 	}
 }
 
-func createTask(r *http.Request, db *pg.DB) {
+func createTask(w http.ResponseWriter, r *http.Request, db *pg.DB) {
 	var task Task
 	task.parseBody(r)
 	if _, err := db.Model(&task).Insert(); err != nil {
 		panic(err)
 	}
 	log.Printf("Create new task: %v", task)
+
+	taskJson, _ := json.Marshal(task)
+	if _, err := w.Write(taskJson); err != nil {
+		panic(err)
+	}
 }
 
 func updateTask(r *http.Request, m []string, db *pg.DB) {
