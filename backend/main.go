@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
@@ -17,7 +17,7 @@ type Task struct {
 	Id          uint   `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Status      int    `json:"status,string"`
+	Status      int    `json:"status"`
 }
 
 func (t Task) String() string {
@@ -27,18 +27,15 @@ func (t Task) String() string {
 	)
 }
 
-func (t *Task) parseForm(r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		panic(err)
-	}
+func (t *Task) parseBody(r *http.Request) {
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
-	form := make(map[string]string)
-	for k, v := range r.Form {
-		form[k] = strings.Join(v, "")
-	}
-	jsonStr, _ := json.Marshal(form)
-
-	err := json.Unmarshal(jsonStr, t)
+	data, _ := ioutil.ReadAll(r.Body)
+	err := json.Unmarshal(data, t)
 	if err != nil {
 		panic(err)
 	}
@@ -79,6 +76,8 @@ func createSchema(db *pg.DB) error {
 }
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("method: %v, path: %v", r.Method, r.URL.Path)
+
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -122,7 +121,7 @@ func getTasks(w http.ResponseWriter, db *pg.DB) {
 
 func createTask(r *http.Request, db *pg.DB) {
 	var task Task
-	task.parseForm(r)
+	task.parseBody(r)
 	if _, err := db.Model(&task).Insert(); err != nil {
 		panic(err)
 	}
@@ -134,7 +133,7 @@ func updateTask(r *http.Request, m []string, db *pg.DB) {
 	task := new(Task)
 	task.find(db, uint(id))
 
-	task.parseForm(r)
+	task.parseBody(r)
 	if _, err := db.Model(task).WherePK().Update(); err != nil {
 		log.Println(err)
 	}
