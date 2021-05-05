@@ -50,7 +50,7 @@ func (t *Task) find(db *pg.DB, id uint) {
 	}
 }
 
-var validPath = regexp.MustCompile("^/(tasks)/([0-9]*)$")
+var validPath = regexp.MustCompile("^/api/(tasks)/([0-9]*)$")
 
 func getDatabase() *pg.DB {
 	db := pg.Connect(&pg.Options{
@@ -153,6 +153,6 @@ func deleteTask(m []string, db *pg.DB) {
 }
 
 func main() {
-	http.HandleFunc("/tasks/", tasksHandler)
+	http.HandleFunc("/api/tasks/", tasksHandler)
 	log.Fatal(http.ListenAndServe(":5000", nil))
 }
