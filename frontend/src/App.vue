@@ -63,14 +63,7 @@ export default {
   },
 
   data: () => ({
-    tasks: [
-      { id: 1, name: "todo1", description: "hogehoge", status: 0 },
-      { id: 2, name: "todo2", description: "hogehoge", status: 0 },
-      { id: 3, name: "doing1", description: "hogehoge", status: 1 },
-      { id: 4, name: "doing2", description: "hogehoge", status: 1 },
-      { id: 5, name: "done1", description: "hogehoge", status: 2 },
-      { id: 6, name: "done2", description: "hogehoge", status: 2 },
-    ],
+    tasks: [],
     dialog: false,
     selectedTaskId: 0,
     dialogHeader: "Create Task",
@@ -101,6 +94,15 @@ export default {
     },
   },
 
+  mounted() {
+    this.axios.get("/api/tasks/").then(({ data }) => {
+      data.forEach((task) => {
+        task.status = Number(task.status);
+      });
+      this.tasks.push(...data);
+    });
+  },
+
   methods: {
     taskList(status) {
       return this.tasks.filter((task) => task.status === status);
@@ -113,8 +115,10 @@ export default {
     },
     updateStatus(status) {
       const task = this.findTaskById(this.selectedTaskId);
-      task.status = status;
-      this.selectedTaskId = 0;
+      this.axios.put(`/api/tasks/${task.id}`, { status: status }).then(() => {
+        task.status = status;
+        this.selectedTaskId = 0;
+      });
     },
     showNewDialog() {
       this.dialog = true;
@@ -123,17 +127,15 @@ export default {
       this.savingAction = this.createTask;
     },
     createTask() {
-      // use API
-      const maxId = this.tasks.reduce((acc, cur) =>
-        acc.id > cur.id ? acc : cur
-      ).id;
-      this.tasks.push({
-        id: maxId + 1,
-        name: this.name,
-        description: this.description,
-        status: 0,
-      });
-      this.dialog = false;
+      this.axios
+        .post("/api/tasks/", {
+          name: this.name,
+          description: this.description,
+        })
+        .then(({ data }) => {
+          this.tasks.push(data);
+          this.dialog = false;
+        });
     },
     showEditDialog(id) {
       const task = this.findTaskById(id);
@@ -146,13 +148,22 @@ export default {
     },
     updateTask() {
       const task = this.findTaskById(this.selectedTaskId);
-      this.$set(task, "name", this.name);
-      this.$set(task, "description", this.description);
-      this.dialog = false;
+      this.axios
+        .put(`/api/tasks/${task.id}`, {
+          name: this.name,
+          description: this.description,
+        })
+        .then(() => {
+          this.$set(task, "name", this.name);
+          this.$set(task, "description", this.description);
+          this.dialog = false;
+        });
     },
     removeTask(id) {
-      const idx = this.tasks.findIndex((task) => task.id === id);
-      this.tasks.splice(idx, 1);
+      this.axios.delete(`/api/tasks/${id}`).then(() => {
+        const idx = this.tasks.findIndex((task) => task.id === id);
+        this.tasks.splice(idx, 1);
+      });
     },
   },
 };
