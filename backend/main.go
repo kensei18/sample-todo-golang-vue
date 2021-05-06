@@ -76,7 +76,7 @@ func createSchema(db *pg.DB) error {
 }
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("method: %v, path: %v", r.Method, r.URL.Path)
+	log.Printf("%v %v", r.Method, r.URL.Path)
 
 	db := getDatabase()
 	defer func() {
