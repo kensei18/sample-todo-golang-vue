@@ -1,7 +1,7 @@
 # sample-todo-golang-vue
 This is a simple task management application with Golang and Vue.js.
 
-![sample-todo-golang-vue](https://user-images.githubusercontent.com/43493096/117771915-95404d80-b271-11eb-83da-da406fcaec67.gif)
+![todo](https://user-images.githubusercontent.com/43493096/117845670-bcbc0800-b2bb-11eb-95ab-8b167a54ab0e.gif)
 
 ## How to use
 The development environment is as follows:
