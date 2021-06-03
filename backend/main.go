@@ -76,8 +76,6 @@ func createSchema(db *pg.DB) error {
 }
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%v %v", r.Method, r.URL.Path)
-
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -125,7 +123,6 @@ func createTask(w http.ResponseWriter, r *http.Request, db *pg.DB) {
 	if _, err := db.Model(&task).Insert(); err != nil {
 		panic(err)
 	}
-	log.Printf("Create new task: %v", task)
 
 	taskJson, _ := json.Marshal(task)
 	if _, err := w.Write(taskJson); err != nil {
@@ -142,7 +139,6 @@ func updateTask(r *http.Request, m []string, db *pg.DB) {
 	if _, err := db.Model(task).WherePK().Update(); err != nil {
 		log.Println(err)
 	}
-	log.Printf("Update task: %v", task)
 }
 
 func deleteTask(m []string, db *pg.DB) {
@@ -151,12 +147,17 @@ func deleteTask(m []string, db *pg.DB) {
 	task.find(db, uint(id))
 	if _, err := db.Model(task).WherePK().Delete(); err != nil {
 		log.Println(err)
-	} else {
-		log.Printf("Delete task: %v", task)
+	}
+}
+
+func accessLog(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%v %v", r.Method, r.URL.Path)
+		h(w, r)
 	}
 }
 
 func main() {
-	http.HandleFunc("/api/tasks/", tasksHandler)
+	http.HandleFunc("/api/tasks/", accessLog(tasksHandler))
 	log.Fatal(http.ListenAndServe(":5000", nil))
 }
