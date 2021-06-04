@@ -91,17 +91,24 @@ func tasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		getTasks(w, db)
+		getTasksHandler(w, r)
 	case "POST":
-		createTask(w, r, db)
+		createTaskHandler(w, r)
 	case "PUT":
-		updateTask(r, m, db)
+		updateTaskHandler(w, r)
 	case "DELETE":
-		deleteTask(m, db)
+		deleteTaskHandler(w, r)
 	}
 }
 
-func getTasks(w http.ResponseWriter, db *pg.DB) {
+func getTasksHandler(w http.ResponseWriter, _ *http.Request) {
+	db := getDatabase()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+
 	var tasks []Task
 	if err := db.Model(&tasks).Select(); err != nil {
 		panic(err)
@@ -117,7 +124,14 @@ func getTasks(w http.ResponseWriter, db *pg.DB) {
 	}
 }
 
-func createTask(w http.ResponseWriter, r *http.Request, db *pg.DB) {
+func createTaskHandler(w http.ResponseWriter, r *http.Request) {
+	db := getDatabase()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+
 	var task Task
 	task.parseBody(r)
 	if _, err := db.Model(&task).Insert(); err != nil {
@@ -130,7 +144,20 @@ func createTask(w http.ResponseWriter, r *http.Request, db *pg.DB) {
 	}
 }
 
-func updateTask(r *http.Request, m []string, db *pg.DB) {
+func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
+	db := getDatabase()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+		http.NotFound(w, r)
+		return
+	}
+
 	id, _ := strconv.Atoi(m[2])
 	task := new(Task)
 	task.find(db, uint(id))
@@ -141,7 +168,20 @@ func updateTask(r *http.Request, m []string, db *pg.DB) {
 	}
 }
 
-func deleteTask(m []string, db *pg.DB) {
+func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
+	db := getDatabase()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+		http.NotFound(w, r)
+		return
+	}
+
 	id, _ := strconv.Atoi(m[2])
 	task := new(Task)
 	task.find(db, uint(id))
