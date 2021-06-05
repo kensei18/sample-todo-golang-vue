@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
+	"github.com/julienschmidt/httprouter"
 )
 
 type Task struct {
@@ -75,33 +76,7 @@ func createSchema(db *pg.DB) error {
 	return nil
 }
 
-func tasksHandler(w http.ResponseWriter, r *http.Request) {
-	db := getDatabase()
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Println(err)
-		}
-	}()
-
-	m := validPath.FindStringSubmatch(r.URL.Path)
-	if m == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	switch r.Method {
-	case "GET":
-		getTasksHandler(w, r)
-	case "POST":
-		createTaskHandler(w, r)
-	case "PUT":
-		updateTaskHandler(w, r)
-	case "DELETE":
-		deleteTaskHandler(w, r)
-	}
-}
-
-func getTasksHandler(w http.ResponseWriter, _ *http.Request) {
+func getTasksHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -124,7 +99,7 @@ func getTasksHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func createTaskHandler(w http.ResponseWriter, r *http.Request) {
+func createTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -144,7 +119,7 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
+func updateTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -168,7 +143,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
+func deleteTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -190,14 +165,21 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func accessLog(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func accessLog(h httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		log.Printf("%v %v", r.Method, r.URL.Path)
-		h(w, r)
+		h(w, r, p)
 	}
 }
 
 func main() {
-	http.HandleFunc("/api/tasks/", accessLog(tasksHandler))
-	log.Fatal(http.ListenAndServe(":5000", nil))
+	router := httprouter.New()
+
+	// /tasks
+	router.GET("/api/tasks", accessLog(getTasksHandler))
+	router.POST("/api/tasks", accessLog(createTaskHandler))
+	router.PUT("/api/tasks/:id", accessLog(updateTaskHandler))
+	router.DELETE("/api/tasks/:id", accessLog(deleteTaskHandler))
+
+	log.Fatal(http.ListenAndServe(":5000", router))
 }
