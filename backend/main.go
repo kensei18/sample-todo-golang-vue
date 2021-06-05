@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"regexp"
 	"strconv"
 
 	"github.com/go-pg/pg/v10"
@@ -47,8 +46,6 @@ func (t *Task) find(db *pg.DB, id uint) {
 		log.Println(err)
 	}
 }
-
-var validPath = regexp.MustCompile("^/api/(tasks)/([0-9]*)$")
 
 func getDatabase() *pg.DB {
 	db := pg.Connect(&pg.Options{
@@ -119,7 +116,7 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 	}
 }
 
-func updateTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func updateTaskHandler(_ http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -127,13 +124,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 		}
 	}()
 
-	m := validPath.FindStringSubmatch(r.URL.Path)
-	if m == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	id, _ := strconv.Atoi(m[2])
+	id, _ := strconv.Atoi(p.ByName("id"))
 	task := new(Task)
 	task.find(db, uint(id))
 
@@ -143,7 +134,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 	}
 }
 
-func deleteTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func deleteTaskHandler(_ http.ResponseWriter, _ *http.Request, p httprouter.Params) {
 	db := getDatabase()
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -151,13 +142,7 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 		}
 	}()
 
-	m := validPath.FindStringSubmatch(r.URL.Path)
-	if m == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	id, _ := strconv.Atoi(m[2])
+	id, _ := strconv.Atoi(p.ByName("id"))
 	task := new(Task)
 	task.find(db, uint(id))
 	if _, err := db.Model(task).WherePK().Delete(); err != nil {
