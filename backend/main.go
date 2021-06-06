@@ -50,7 +50,7 @@ func (t *Task) find(db *pg.DB, id uint) {
 
 func (t *Task) create(r io.ReadCloser) {
 	t.parse(r)
-	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+	connectDatabase(func(db *pg.DB) {
 		if _, err := db.Model(t).Insert(); err != nil {
 			panic(err)
 		}
@@ -58,7 +58,7 @@ func (t *Task) create(r io.ReadCloser) {
 }
 
 func (t *Task) update(id uint, r io.ReadCloser) {
-	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+	connectDatabase(func(db *pg.DB) {
 		t.find(db, id)
 		t.parse(r)
 		if _, err := db.Model(t).WherePK().Update(); err != nil {
@@ -68,30 +68,30 @@ func (t *Task) update(id uint, r io.ReadCloser) {
 }
 
 func (t *Task) delete(id uint) {
-	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+	connectDatabase(func(db *pg.DB) {
 		t.find(db, id)
 		if _, err := db.Model(t).WherePK().Delete(); err != nil {
 			log.Println(err)
 		}
-	})
+	})()
 }
 
 type Tasks []Task
 
 func (t *Tasks) get() {
-	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+	connectDatabase(func(db *pg.DB) {
 		if err := db.Model(t).Select(); err != nil {
 			panic(err)
 		}
 	})()
 }
 
-type handleDatabase func(*pg.DB, ...interface{})
+type handleDatabase func(*pg.DB)
 
 func connectDatabase(f handleDatabase) func(...interface{}) {
 	return func(i ...interface{}) {
 		db := getDatabase()
-		f(db, i)
+		f(db)
 		if err := db.Close(); err != nil {
 			log.Println(err)
 		}
