@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,14 +28,14 @@ func (t Task) String() string {
 	)
 }
 
-func (t *Task) parseBody(r *http.Request) {
+func (t *Task) parse(r io.ReadCloser) {
 	defer func() {
-		if err := r.Body.Close(); err != nil {
+		if err := r.Close(); err != nil {
 			panic(err)
 		}
 	}()
 
-	data, _ := ioutil.ReadAll(r.Body)
+	data, _ := ioutil.ReadAll(r)
 	err := json.Unmarshal(data, t)
 	if err != nil {
 		panic(err)
@@ -44,6 +45,56 @@ func (t *Task) parseBody(r *http.Request) {
 func (t *Task) find(db *pg.DB, id uint) {
 	if err := db.Model(t).Where("id = ?", id).Select(); err != nil {
 		log.Println(err)
+	}
+}
+
+func (t *Task) create(r io.ReadCloser) {
+	t.parse(r)
+	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+		if _, err := db.Model(t).Insert(); err != nil {
+			panic(err)
+		}
+	})()
+}
+
+func (t *Task) update(id uint, r io.ReadCloser) {
+	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+		t.find(db, id)
+		t.parse(r)
+		if _, err := db.Model(t).WherePK().Update(); err != nil {
+			log.Println(err)
+		}
+	})()
+}
+
+func (t *Task) delete(id uint) {
+	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+		t.find(db, id)
+		if _, err := db.Model(t).WherePK().Delete(); err != nil {
+			log.Println(err)
+		}
+	})
+}
+
+type Tasks []Task
+
+func (t *Tasks) get() {
+	connectDatabase(func(db *pg.DB, _ ...interface{}) {
+		if err := db.Model(t).Select(); err != nil {
+			panic(err)
+		}
+	})()
+}
+
+type handleDatabase func(*pg.DB, ...interface{})
+
+func connectDatabase(f handleDatabase) func(...interface{}) {
+	return func(i ...interface{}) {
+		db := getDatabase()
+		f(db, i)
+		if err := db.Close(); err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -74,17 +125,8 @@ func createSchema(db *pg.DB) error {
 }
 
 func getTasksHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	db := getDatabase()
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Println(err)
-		}
-	}()
-
-	var tasks []Task
-	if err := db.Model(&tasks).Select(); err != nil {
-		panic(err)
-	}
+	tasks := new(Tasks)
+	tasks.get()
 
 	tasksJson, err := json.Marshal(tasks)
 	if err != nil {
@@ -97,18 +139,8 @@ func getTasksHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params
 }
 
 func createTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	db := getDatabase()
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Println(err)
-		}
-	}()
-
 	var task Task
-	task.parseBody(r)
-	if _, err := db.Model(&task).Insert(); err != nil {
-		panic(err)
-	}
+	task.create(r.Body)
 
 	taskJson, _ := json.Marshal(task)
 	if _, err := w.Write(taskJson); err != nil {
@@ -117,37 +149,15 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 }
 
 func updateTaskHandler(_ http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	db := getDatabase()
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Println(err)
-		}
-	}()
-
 	id, _ := strconv.Atoi(p.ByName("id"))
 	task := new(Task)
-	task.find(db, uint(id))
-
-	task.parseBody(r)
-	if _, err := db.Model(task).WherePK().Update(); err != nil {
-		log.Println(err)
-	}
+	task.update(uint(id), r.Body)
 }
 
 func deleteTaskHandler(_ http.ResponseWriter, _ *http.Request, p httprouter.Params) {
-	db := getDatabase()
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Println(err)
-		}
-	}()
-
 	id, _ := strconv.Atoi(p.ByName("id"))
 	task := new(Task)
-	task.find(db, uint(id))
-	if _, err := db.Model(task).WherePK().Delete(); err != nil {
-		log.Println(err)
-	}
+	task.delete(uint(id))
 }
 
 func accessLog(h httprouter.Handle) httprouter.Handle {
