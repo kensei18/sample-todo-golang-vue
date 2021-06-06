@@ -95,7 +95,7 @@ export default {
   },
 
   mounted() {
-    this.axios.get("/api/tasks/").then(({ data }) => {
+    this.axios.get("/api/tasks").then(({ data }) => {
       data.forEach((task) => {
         task.status = Number(task.status);
       });
@@ -128,7 +128,7 @@ export default {
     },
     createTask() {
       this.axios
-        .post("/api/tasks/", {
+        .post("/api/tasks", {
           name: this.name,
           description: this.description,
         })
