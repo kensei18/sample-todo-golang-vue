@@ -29,15 +29,13 @@ func (t Task) String() string {
 }
 
 func (t *Task) parse(r io.ReadCloser) {
-	defer func() {
-		if err := r.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
 	data, _ := ioutil.ReadAll(r)
 	err := json.Unmarshal(data, t)
 	if err != nil {
+		panic(err)
+	}
+
+	if err = r.Close(); err != nil {
 		panic(err)
 	}
 }
@@ -48,15 +46,13 @@ func (t *Task) find(db *pg.DB, id uint) {
 	}
 }
 
-func (t *Task) create(db *pg.DB, r io.ReadCloser) {
-	t.parse(r)
+func (t *Task) create(db *pg.DB) {
 	if _, err := db.Model(t).Insert(); err != nil {
 		panic(err)
 	}
 }
 
-func (t *Task) update(db *pg.DB, r io.ReadCloser) {
-	t.parse(r)
+func (t *Task) update(db *pg.DB) {
 	if _, err := db.Model(t).WherePK().Update(); err != nil {
 		log.Println(err)
 	}
@@ -131,7 +127,8 @@ func getTasksHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params
 func createTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var task Task
 	connectDatabase(func(db *pg.DB) {
-		task.create(db, r.Body)
+		task.parse(r.Body)
+		task.create(db)
 	})
 
 	taskJson, _ := json.Marshal(task)
@@ -145,7 +142,8 @@ func updateTaskHandler(_ http.ResponseWriter, r *http.Request, p httprouter.Para
 	task := new(Task)
 	connectDatabase(func(db *pg.DB) {
 		task.find(db, uint(id))
-		task.update(db, r.Body)
+		task.parse(r.Body)
+		task.update(db)
 	})
 }
 
