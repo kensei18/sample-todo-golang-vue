@@ -88,8 +88,8 @@ func (t *Tasks) get() {
 
 type handleDatabase func(*pg.DB)
 
-func connectDatabase(f handleDatabase) func(...interface{}) {
-	return func(i ...interface{}) {
+func connectDatabase(f handleDatabase) func() {
+	return func() {
 		db := getDatabase()
 		f(db)
 		if err := db.Close(); err != nil {
