@@ -48,42 +48,32 @@ func (t *Task) find(db *pg.DB, id uint) {
 	}
 }
 
-func (t *Task) create(r io.ReadCloser) {
+func (t *Task) create(db *pg.DB, r io.ReadCloser) {
 	t.parse(r)
-	connectDatabase(func(db *pg.DB) {
-		if _, err := db.Model(t).Insert(); err != nil {
-			panic(err)
-		}
-	})()
+	if _, err := db.Model(t).Insert(); err != nil {
+		panic(err)
+	}
 }
 
-func (t *Task) update(id uint, r io.ReadCloser) {
-	connectDatabase(func(db *pg.DB) {
-		t.find(db, id)
-		t.parse(r)
-		if _, err := db.Model(t).WherePK().Update(); err != nil {
-			log.Println(err)
-		}
-	})()
+func (t *Task) update(db *pg.DB, r io.ReadCloser) {
+	t.parse(r)
+	if _, err := db.Model(t).WherePK().Update(); err != nil {
+		log.Println(err)
+	}
 }
 
-func (t *Task) delete(id uint) {
-	connectDatabase(func(db *pg.DB) {
-		t.find(db, id)
-		if _, err := db.Model(t).WherePK().Delete(); err != nil {
-			log.Println(err)
-		}
-	})()
+func (t *Task) delete(db *pg.DB) {
+	if _, err := db.Model(t).WherePK().Delete(); err != nil {
+		log.Println(err)
+	}
 }
 
 type Tasks []Task
 
-func (t *Tasks) get() {
-	connectDatabase(func(db *pg.DB) {
-		if err := db.Model(t).Select(); err != nil {
-			panic(err)
-		}
-	})()
+func (t *Tasks) get(db *pg.DB) {
+	if err := db.Model(t).Select(); err != nil {
+		panic(err)
+	}
 }
 
 type handleDatabase func(*pg.DB)
@@ -126,7 +116,9 @@ func createSchema(db *pg.DB) error {
 
 func getTasksHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	tasks := new(Tasks)
-	tasks.get()
+	connectDatabase(func(db *pg.DB) {
+		tasks.get(db)
+	})
 
 	tasksJson, err := json.Marshal(tasks)
 	if err != nil {
@@ -140,7 +132,9 @@ func getTasksHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params
 
 func createTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var task Task
-	task.create(r.Body)
+	connectDatabase(func(db *pg.DB) {
+		task.create(db, r.Body)
+	})
 
 	taskJson, _ := json.Marshal(task)
 	if _, err := w.Write(taskJson); err != nil {
@@ -151,13 +145,19 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 func updateTaskHandler(_ http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id, _ := strconv.Atoi(p.ByName("id"))
 	task := new(Task)
-	task.update(uint(id), r.Body)
+	connectDatabase(func(db *pg.DB) {
+		task.find(db, uint(id))
+		task.update(db, r.Body)
+	})
 }
 
 func deleteTaskHandler(_ http.ResponseWriter, _ *http.Request, p httprouter.Params) {
 	id, _ := strconv.Atoi(p.ByName("id"))
 	task := new(Task)
-	task.delete(uint(id))
+	connectDatabase(func(db *pg.DB) {
+		task.find(db, uint(id))
+		task.delete(db)
+	})
 }
 
 func accessLog(h httprouter.Handle) httprouter.Handle {
